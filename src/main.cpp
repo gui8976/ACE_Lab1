@@ -18,65 +18,90 @@
 #define LED4 3
 #define LED5 4
 
-NeoPixelConnect strip(5, MAXIMUM_NUM_NEOPIXELS, pio0, 0);
+NeoPixelConnect strip(6, MAXIMUM_NUM_NEOPIXELS, pio0, 0);
 
 Bounce s_go = Bounce();
 Bounce s_up = Bounce();
 Bounce s_down = Bounce();
 
-const unsigned long interval = 100; // interval at which to blink (milliseconds)
+unsigned long interval = 2000; // interval at which to blink (milliseconds)
+unsigned long time_wait;
+const unsigned long fast_interval = 100;
 
 // define the structures here:
 
 // sturture for the configuration machine
-typedef enum
+typedef enum config_machine
 {
   OFF,
   ON,
   C1,
   C2,
   C3,
-  C4,
 } config_machine;
 
 // structure for the time machine
-typedef enum
+typedef enum time_machine
 {
   IDLE,
   RUN,
+  BLINKING,
   PAUSE,
 } time_machine;
 
-typedef enum 
+typedef enum
 {
-  T1 = 1000, // will store last time LED was updated
-  T2 = 2000, // will store last time LED was updated
-  T5 = 5000, // will store last time LED was updated
-  T10 = 10000, // will store last time LED was updated
-}timer_interval;
+  S1,
+  S2,
+  S5,
+  S10,
+} config1;
 
 typedef enum
 {
-  LED5_STATE1,
-  LED5_STATE2,
-  LED5_STATE3,
-} led5_state;
+  Default_timer,
+  HalfBlink,
+  Fade,
+} config2;
+
+typedef enum
+{
+  AZUL,
+  VIOLETA,
+  VERMELHO,
+  VERDE,
+  CIANO,
+  LARANJA,
+  BRANCO,
+} color_machine;
+
+typedef enum
+{
+  ALL,
+  LEDS4,
+  LEDS3,
+  LEDS2,
+  LEDS1,
+  BLINK,
+  PAUSED,
+} led_machine;
+
 // initiate the values of the structures
-
-config_machine config = OFF;
+config_machine config = C2;
 config_machine config_previous = OFF;
-time_machine time = IDLE;
-timer_interval timer = T1;
-led5_state state_led5 = LED5_STATE1;
+time_machine tempo = IDLE;
+color_machine cor = AZUL;
+config2 config2_mode = Default_timer;
+config1 config1_mode = S2;
+led_machine led_mode = ALL;
 
-//! meter numa class PFFFFF
 // creates a function that blink the leds
 void blink(uint16_t led_to_blink)
 {
-  bool led_state = false;
-  unsigned long previousMillis = 0;
+  static bool led_state = false;
+  static unsigned long previousMillis = 0;
 
-  if (millis() - previousMillis >= interval)
+  if (millis() - previousMillis >= fast_interval)
   {
     led_state = !led_state;
     previousMillis = millis();
@@ -92,10 +117,10 @@ void blink(uint16_t led_to_blink)
   }
 }
 
-void blink_with_interval(uint16_t led_to_blink, unsigned long interval)
+void blink_with_interval(uint16_t led_to_blink)
 {
-  bool led_state = false;
-  unsigned long previousMillis = 0;
+  static bool led_state = false;
+  static long previousMillis = 0;
 
   if (millis() - previousMillis >= interval)
   {
@@ -115,16 +140,16 @@ void blink_with_interval(uint16_t led_to_blink, unsigned long interval)
 
 void blink_all()
 {
-  bool led_state = false;
-  unsigned long previousMillis = 0;
-  if (millis() - previousMillis >= 100)
+  static bool led_state = false;
+  static unsigned long previousMillis = 0;
+  if (millis() - previousMillis >= fast_interval)
   {
     led_state = !led_state;
     previousMillis = millis();
 
     if (led_state)
     {
-      strip.neoPixelFill(0, 255, 0, 1); // por definir as cores
+      strip.neoPixelFill(0, 255, 255, 1); // por definir as cores
     }
     else
     {
@@ -133,287 +158,288 @@ void blink_all()
   }
 }
 
-void led_turn_off(uint16_t led_to_turn_off)
+void led_show(int leds_to_light_up)
 {
-  strip.neoPixelSetValue(led_to_turn_off, 0, 0, 0, 1);
-}
-
-void led_turn_on(uint16_t led_to_turn_on)
-{
-  strip.neoPixelSetValue(led_to_turn_on, 255, 255, 255, 1);
-}
-
-void led_set_color(uint16_t led_to_set_color, uint8_t red, uint8_t green, uint8_t blue)
-{
-  strip.neoPixelSetValue(led_to_set_color, red, green, blue, 1);
-}
-
-void led_state_default()
-{
-  // turn on all leds
-  strip.neoPixelFill(255, 255, 255, 1);
-}
-
-// changes led coulour given an input from the user
-void changes_led_colour(bool button_pressed)
-{
-  int times_pressed = 1;
-  if (button_pressed && times_pressed == 1)
+  // sees the number of leds that need to be lit up
+  for (int leds_to_light = leds_to_light_up; leds_to_light > -1; leds_to_light--)
   {
-    times_pressed++;
-    led_set_color(LED5, 255, 255, 255); //! FALTA DEFINIR AS CORES
-    button_pressed = false;
-  }
-  if (button_pressed && times_pressed == 2)
-  {
-    times_pressed++;
-    led_set_color(LED5, 255, 255, 255); //! FALTA DEFINIR AS CORES
-    button_pressed = false;
-  }
-  if (button_pressed && times_pressed == 3)
-  {
-    times_pressed++;
-    led_set_color(LED5, 255, 255, 255); //! FALTA DEFINIR AS CORES
-    button_pressed = false;
-  }
-  if (button_pressed && times_pressed == 4)
-  {
-    times_pressed++;
-    led_set_color(LED5, 255, 255, 255); //! FALTA DEFINIR AS CORES
-    button_pressed = false;
-  }
-  if (button_pressed && times_pressed == 5)
-  {
-    times_pressed++;
-    led_set_color(LED5, 255, 255, 255); //! FALTA DEFINIR AS CORES
-    button_pressed = false;
-  }
-  if (button_pressed && times_pressed == 6)
-  {
-    times_pressed++;
-    led_set_color(LED5, 255, 255, 255); //! FALTA DEFINIR AS CORES
-    button_pressed = false;
-  }
-  if (button_pressed && times_pressed == 7)
-  {
-    times_pressed = 1;
-    led_set_color(LED5, 255, 255, 255); //! FALTA DEFINIR AS CORES
-    button_pressed = false;
+    strip.neoPixelSetValue(leds_to_light, 255, 0, 0, 1);
   }
 }
 
-// a function that fades the led intensity using the neopixel library
-void fade(){
-  // Fade in
-  // Fade out
-  for(int i = 255; i >= 0; i--){
-    strip.neoPixelSetValue(LED5, i, i, i, 1);
-  }
-
-}
-
-void config_1()
+void timer_show_leds()
 {
-
-  // turns off all the leds
-  strip.neoPixelClear(1);
-  // led 3 blinking
-  blink(LED1);
-  // led 5 changes colour
-  switch (timer)
+  if (tempo == RUN)
   {
-  case T1:
-    if (s_down.rose())
-      timer = T2;
-    blink_with_interval(LED5, T1);
-
-    break;
-
-  case T2:
-    if (s_down.rose())
-      timer = T5;
-    blink_with_interval(LED5, T2);
-
-    break;
-  case T5:
-    if (s_down.rose())
-      timer = T10;
-    blink_with_interval(LED5, T5);
-
-    break;
-  case T10:
-    if (s_down.rose())
-      timer = T1;
-    blink_with_interval(LED5, T10);
-
-    break;
-  default:
-    break;
-  }
-}
-
-void config_2()
-{
-  // turns off all the leds
-  strip.neoPixelClear(1);
-  // led 4 blinking
-  blink(LED2);
-  //led 5 switches between 3 states
-  if(state_led5 == LED5_STATE1)
-  {
-    if (s_down.rose())
-      state_led5 = LED5_STATE2;
-    blink_with_interval(LED5, timer);
-  }
-  if(state_led5 == LED5_STATE2)
-  {
-    if (s_down.rose())
-      state_led5 = LED5_STATE3;
-
-    strip.neoPixelSetValue(LED5, 255, 255, 255, 1); //! por definir as cores
-    unsigned long currentMillis = millis();
-    if(currentMillis >= timer/2)
+    static unsigned long atual = millis();
+    switch (led_mode)
     {
-      state_led5 = LED5_STATE1;
-      strip.neoPixelSetValue(LED5, 0, 0, 0, 1);
-      blink(LED5);
+    case ALL:
+      led_show(4);
+      Serial.println("10s");
+      if (millis() - atual >= interval)
+      {
+        led_mode = LEDS4;
+        Serial.println("8s");
+        atual = millis();
+        strip.neoPixelClear(1);
+      }
+      break;
+    case LEDS4:
+      Serial.println("ENTROU");
+      led_show(3);
+      if (millis() - atual >= interval)
+      {
+        led_mode = LEDS3;
+        Serial.println("6s");
+        atual = millis();
+        strip.neoPixelClear(1);
+      }
+      break;
+    case LEDS3:
+      led_show(2);
+      if (millis() - atual >= interval)
+      {
+        led_mode = LEDS2;
+        Serial.println("4s");
+        atual = millis();
+        strip.neoPixelClear(1);
+      }
+      break;
+    case LEDS2:
+      led_show(1);
+      if (millis() - atual >= interval)
+      {
+        led_mode = LEDS1;
+        Serial.println("2s");
+        atual = millis();
+        strip.neoPixelClear(1);
+      }
+      break;
+    case LEDS1:
+      led_show(0);
+      if (millis() - atual >= interval)
+      {
+        led_mode = BLINK;
+        Serial.println("0s");
+      }
+      break;
+    case PAUSED:
+      break;
+    default:
+      break;
     }
-
-  }
-  if(state_led5 == LED5_STATE3)
-  {
-    if (s_down.rose())
-      state_led5 = LED5_STATE1;
-    fade(LED5, timer);
   }
 }
 
-void config_3()
+void default_function()
 {
-  // turns off all the leds
-  strip.neoPixelClear(1);
-  // led 2 blinking
-  blink(LED3);
-  // led 5 changes colour
-  if (s_down.rose())
-    changes_led_colour(true);
-}
-
-void state_machine_config(config_machine config, time_machine time)
-{
-  bool button_pressed = false;
-  int state_led5 = 1;
-
-  switch (config)
+  switch (tempo)
   {
-  case OFF:
-    // se o botão for pressionado
-
+  case IDLE:
+    Serial.println("IDLE");
+    if (s_go.rose())
+    {
+      tempo = RUN;
+    }
     break;
 
-  case ON:
-    if (1 && (config_previous != OFF) /*"botão for pressionado durante 3s"*/)
+  case RUN:
+    Serial.println("RUN");
+    timer_show_leds();
+    if (led_mode == BLINK)
     {
-      config = config_previous;
+      tempo = BLINKING;
     }
-    else
-      config = C1;
-
-    //! falta implementar o timer de 2 segund0s , blink já feito
-
-    // os leds 1,2,3,4,5 desligam com um intervalo predeifinido de tempo 2000
-    // no final do tempo os leds entram em blink state.
-
+    if(s_down.rose())
+    {
+      tempo = PAUSE;
+    }
+    break;
+  case BLINKING:
     blink_all();
     break;
 
-  case C1:
-    if (1 /*"botão for pressionado"*/)
+  case PAUSE:
+    Serial.println("PAUSE");
+    if(s_down.rose())
     {
-      config = C2;
+      tempo = RUN;
     }
-    if (1 /*"botão for pressionado durante 3s"*/)
-    {
-      config = ON;
-      config_previous = C1;
-    }
-    config_1();
-    // led 5 alterna o tempo que tem para o ficar ligado entre: 1,2,5,10 segundos
-    // led 1 a piscar
-    break;
-
-  case C2:
-    if (1 /*"botão for pressionado"*/)
-    {
-      config = C1;
-    }
-    if (1 /*"botão for pressionado durante 3s"*/)
-    {
-      config = ON;
-      config_previous = C2;
-    }
-    config_2();
-    // led 5 aterna entre varios estados :
-    // estado 1: desliga ao fim do intervalo de tempo
-    // estado 2: para a segunda parte do intervalo de tempo o led dá blink
-    // estado 3: a luminosidade do led vai diminuindo até ao fim do intervalo de tempo
-    // led 2 a piscar
-    /* code */
-    break;
-
-  case C3:
-    if (1 /*"botão for pressionado"*/)
-    {
-      config = C4;
-    }
-    if (1 /*"botão for pressionado durante 3s"*/)
-    {
-      config = ON;
-      config_previous = C3;
-    }
-    config_3();
-    // led 5 alterna entre varias cores : violet, blue , cyan, green , yellow, orange , white
-    // tem que ler o input do utilizador para mudar de cor EX: pode ser um botão
-    // led 3 a piscar
-    break;
-
-  case C4:
-    if (1 /*"botão for pressionado"*/)
-    {
-      config = C1;
-    }
-    if (1 /*"botão for pressionado durante 3s"*/)
-    {
-      config = ON;
-      config_previous = C4;
-    }
-    //! Falta decidir qual é o modo extra
-    // para entrar neste estado é necessario esperar 30 segundos na posição de todos os leds a piscar
-    // led 5 alterna entre varias cores : violet, blue , cyan, green , yellow, orange , white e o led esta a piscar
-    // tem que ler o input do utilizador para mudar de cor EX: pode ser um botão
-    // led 4 a piscar
-
-    /* code */
     break;
 
   default:
     break;
   }
+}
 
-  switch (time)
+// alínea a)
+
+void config_machine_ME()
+{
+  switch (config)
   {
-  case IDLE:
-    /* code */
+  case C1:
+    blink(LED1);
+    if (s_down.rose())
+      config = C2;
     break;
-  case RUN:
-    /* code */
+  case C2:
+    blink(LED2);
+    /*
+    if (s_down.rose())
+      config = C3;
     break;
-  case PAUSE:
-    /* code */
+    */
     break;
+  case C3:
+    blink(LED3);
+    if (s_up.rose())
+      config = C1;
+    break;
+  }
+}
 
-  default:
-    break;
+void configuration_1_ME()
+{
+  if (config == C1)
+  {
+    switch (config1_mode)
+    {
+    case S1:
+      Serial.println("S1");
+      blink_with_interval(LED5);
+      if (s_go.rose())
+      {
+        config1_mode = S2;
+        interval = 2000;
+      }
+      break;
+    case S2:
+      Serial.println("S2");
+      blink_with_interval(LED5);
+      if (s_go.rose())
+      {
+        config1_mode = S5;
+        interval = 5000;
+      }
+      break;
+
+    case S5:
+      Serial.println("S5");
+      blink_with_interval(LED5);
+      if (s_go.rose())
+      {
+        config1_mode = S10;
+        interval = 10000;
+      }
+      break;
+
+    case S10:
+      Serial.println("S10");
+      blink_with_interval(LED5);
+      if (s_go.rose())
+      {
+        config1_mode = S1;
+        interval = 1000;
+      }
+      break;
+
+    default:
+      break;
+    }
+  }
+}
+
+void configuration_2_ME()
+{
+  if (config == C2)
+  {
+
+    unsigned long currentmillis;
+    switch (config2_mode)
+    {
+    case Default_timer:
+      blink_with_interval(LED5);
+      if (s_down.rose())
+      {
+        config2_mode = HalfBlink;
+        currentmillis = millis();
+      }
+      break;
+    case HalfBlink:
+
+      strip.neoPixelSetValue(LED5, 255, 0, 0, 1);
+      if (millis() - currentmillis >= interval / 2)
+      {
+        Serial.println("HALF BLINK");
+        blink(LED5);
+      }
+      if (s_down.rose())
+        config2_mode = Fade;
+      break;
+    case Fade:
+      if (s_down.rose())
+        config2_mode = Default_timer;
+      break;
+
+    default:
+      break;
+    }
+  }
+}
+
+void choose_color()
+{
+  if (config == C3)
+  {
+    switch (cor)
+    {
+    case AZUL:
+      strip.neoPixelSetValue(4, 0, 0, 255, 1);
+      Serial.println("Azul");
+      if (s_down.rose())
+        cor = VIOLETA;
+      break;
+    case VIOLETA:
+      strip.neoPixelSetValue(4, 0, 255, 0, 1);
+      Serial.println("VIOLETA");
+      if (s_down.rose())
+        cor = VERMELHO;
+      break;
+    case VERMELHO:
+      strip.neoPixelSetValue(LED5, 255, 0, 0, 1);
+      Serial.println("VERMELHO");
+      if (s_down.rose())
+        cor = VERDE;
+      break;
+    case VERDE:
+      strip.neoPixelSetValue(LED5, 0, 255, 255, 1);
+      Serial.println("VERDE");
+      if (s_down.rose())
+        cor = CIANO;
+      break;
+    case CIANO:
+      strip.neoPixelSetValue(LED5, 255, 0, 255, 1);
+      Serial.println("CIANO");
+      if (s_down.rose())
+        cor = LARANJA;
+      break;
+    case LARANJA:
+      strip.neoPixelSetValue(LED5, 255, 255, 0, 1);
+      Serial.println("LARANJA");
+      if (s_down.rose())
+        cor = BRANCO;
+      break;
+    case BRANCO:
+      strip.neoPixelSetValue(LED5, 255, 255, 255, 1);
+      Serial.println("BRANCO");
+      if (s_down.rose())
+        cor = AZUL;
+      break;
+    default:
+      break;
+    }
   }
 }
 
@@ -423,6 +449,14 @@ void setup()
   s_up.attach(Sup, INPUT_PULLUP);
   s_down.attach(Sdown, INPUT_PULLUP);
   // put your setup code here, to run once:
+
+  Serial.begin(9600);
+
+  s_go.interval(5);
+  s_up.interval(5);
+  s_down.interval(5);
+
+  strip.neoPixelClear(1);
 }
 
 void loop()
@@ -431,5 +465,19 @@ void loop()
   s_up.update();
   s_down.update();
 
+  // led_show(3);
+  // blink_all();
+  // configuration_3();
+  default_function();
+
+  // led_show(0);
+  // config_machine_ME();
+
+  // configuration_2_ME();
+
+  // configuration_1_ME();
+
   // put your main code here, to run repeatedly:
+
+  delay(10); //! NÃO ESQUECER DELAY, SENÃO FICA ESTRAGADO
 }

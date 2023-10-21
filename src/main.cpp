@@ -34,7 +34,6 @@ const unsigned long fast_interval = 100;
 typedef enum config_machine
 {
   OFF,
-  ON,
   C1,
   C2,
   C3,
@@ -47,6 +46,8 @@ typedef enum time_machine
   RUN,
   BLINKING,
   PAUSE,
+  CONFIG,
+  CONFIGURAR,
 } time_machine;
 
 typedef enum
@@ -87,13 +88,18 @@ typedef enum
 } led_machine;
 
 // initiate the values of the structures
-config_machine config = C2;
-config_machine config_previous = OFF;
+config_machine config = OFF;
+
 time_machine tempo = IDLE;
+time_machine tempo_previous = IDLE;
+
 color_machine cor = AZUL;
+
 config2 config2_mode = Default_timer;
 config1 config1_mode = S2;
+
 led_machine led_mode = ALL;
+led_machine led_mode_previous = ALL;
 
 // creates a function that blink the leds
 void blink(uint16_t led_to_blink)
@@ -169,7 +175,7 @@ void led_show(int leds_to_light_up)
 
 void timer_show_leds()
 {
-  if (tempo == RUN)
+  if (tempo == RUN || tempo == PAUSE)
   {
     static unsigned long atual = millis();
     switch (led_mode)
@@ -177,6 +183,10 @@ void timer_show_leds()
     case ALL:
       led_show(4);
       Serial.println("10s");
+      if (tempo == PAUSE)
+      {
+        led_mode_previous = ALL;
+      }
       if (millis() - atual >= interval)
       {
         led_mode = LEDS4;
@@ -184,10 +194,15 @@ void timer_show_leds()
         atual = millis();
         strip.neoPixelClear(1);
       }
+
       break;
     case LEDS4:
       Serial.println("ENTROU");
       led_show(3);
+      if (tempo == PAUSE)
+      {
+        led_mode_previous = LEDS4;
+      }
       if (millis() - atual >= interval)
       {
         led_mode = LEDS3;
@@ -198,6 +213,10 @@ void timer_show_leds()
       break;
     case LEDS3:
       led_show(2);
+      if (tempo == PAUSE)
+      {
+        led_mode_previous = LEDS3;
+      }
       if (millis() - atual >= interval)
       {
         led_mode = LEDS2;
@@ -208,6 +227,10 @@ void timer_show_leds()
       break;
     case LEDS2:
       led_show(1);
+      if (tempo == PAUSE)
+      {
+        led_mode_previous = LEDS2;
+      }
       if (millis() - atual >= interval)
       {
         led_mode = LEDS1;
@@ -218,13 +241,23 @@ void timer_show_leds()
       break;
     case LEDS1:
       led_show(0);
+      if (tempo == PAUSE)
+      {
+        led_mode_previous = LEDS1;
+      }
       if (millis() - atual >= interval)
       {
         led_mode = BLINK;
         Serial.println("0s");
       }
+
       break;
     case PAUSED:
+      if (tempo == RUN)
+      {
+        led_mode = led_mode_previous;
+        atual = millis();
+      }
       break;
     default:
       break;
@@ -232,65 +265,24 @@ void timer_show_leds()
   }
 }
 
-void default_function()
-{
-  switch (tempo)
-  {
-  case IDLE:
-    Serial.println("IDLE");
-    if (s_go.rose())
-    {
-      tempo = RUN;
-    }
-    break;
-
-  case RUN:
-    Serial.println("RUN");
-    timer_show_leds();
-    if (led_mode == BLINK)
-    {
-      tempo = BLINKING;
-    }
-    if(s_down.rose())
-    {
-      tempo = PAUSE;
-    }
-    break;
-  case BLINKING:
-    blink_all();
-    break;
-
-  case PAUSE:
-    Serial.println("PAUSE");
-    if(s_down.rose())
-    {
-      tempo = RUN;
-    }
-    break;
-
-  default:
-    break;
-  }
-}
-
-// alínea a)
-
 void config_machine_ME()
 {
   switch (config)
   {
+  case OFF:
+    if (tempo == CONFIGURAR)
+      config = C1;
+    break;
   case C1:
     blink(LED1);
-    if (s_down.rose())
+    if (s_up.rose())
       config = C2;
     break;
   case C2:
     blink(LED2);
-    /*
-    if (s_down.rose())
+    if (s_up.rose())
       config = C3;
     break;
-    */
     break;
   case C3:
     blink(LED3);
@@ -299,6 +291,86 @@ void config_machine_ME()
     break;
   }
 }
+void default_function()
+{
+  static unsigned long tempo_esperado = 0;
+  switch (tempo)
+  {
+  case IDLE:
+    Serial.println("IDLE");
+    if (s_go.rose())
+    {
+      tempo = RUN;
+    }
+    if (s_up.fell())
+    {
+      tempo = CONFIG;
+      tempo_previous = IDLE;
+      tempo_esperado = millis();
+      Serial.println("A pressionou");
+    }
+    break;
+
+  case CONFIG:
+    if (s_up.read() == 1)
+    {
+      tempo = tempo_previous;
+    }
+    if ((millis() - tempo_esperado >= 3000) && (s_up.read() == 0))
+    {
+      Serial.println("A pressionar durante 3s");
+      tempo = CONFIGURAR;
+    }
+    break;
+  case CONFIGURAR:
+    Serial.println("CONFIGURAR");
+    config_machine_ME();
+    break;
+  case RUN:
+    if (s_up.fell())
+    {
+      tempo = CONFIG;
+      tempo_previous = RUN;
+      tempo_esperado = millis();
+      Serial.println("A pressionou");
+    }
+    if (led_mode == BLINK)
+    {
+      tempo = BLINKING;
+    }
+    if (s_down.rose())
+    {
+      tempo = PAUSE;
+    }
+    Serial.println("RUN");
+    timer_show_leds();
+    break;
+  case BLINKING:
+    blink_all();
+    break;
+
+  case PAUSE:
+    Serial.println("PAUSE");
+    if (s_up.fell())
+    {
+      tempo = CONFIG;
+      tempo_previous = PAUSE;
+      tempo_esperado = millis();
+      Serial.println("A pressionou");
+    }
+    if (s_down.rose())
+    {
+      tempo = RUN;
+    }
+
+    break;
+
+  default:
+    break;
+  }
+}
+
+// alínea a)
 
 void configuration_1_ME()
 {
@@ -309,7 +381,7 @@ void configuration_1_ME()
     case S1:
       Serial.println("S1");
       blink_with_interval(LED5);
-      if (s_go.rose())
+      if (s_down.rose())
       {
         config1_mode = S2;
         interval = 2000;
@@ -318,7 +390,7 @@ void configuration_1_ME()
     case S2:
       Serial.println("S2");
       blink_with_interval(LED5);
-      if (s_go.rose())
+      if (s_down.rose())
       {
         config1_mode = S5;
         interval = 5000;
@@ -328,7 +400,7 @@ void configuration_1_ME()
     case S5:
       Serial.println("S5");
       blink_with_interval(LED5);
-      if (s_go.rose())
+      if (s_down.rose())
       {
         config1_mode = S10;
         interval = 10000;
@@ -338,7 +410,7 @@ void configuration_1_ME()
     case S10:
       Serial.println("S10");
       blink_with_interval(LED5);
-      if (s_go.rose())
+      if (s_down.rose())
       {
         config1_mode = S1;
         interval = 1000;
@@ -465,17 +537,16 @@ void loop()
   s_up.update();
   s_down.update();
 
-  // led_show(3);
-  // blink_all();
-  // configuration_3();
   default_function();
+  // configuration_3();
 
-  // led_show(0);
   // config_machine_ME();
 
-  // configuration_2_ME();
+  configuration_1_ME();
 
-  // configuration_1_ME();
+  configuration_2_ME();
+
+
 
   // put your main code here, to run repeatedly:
 

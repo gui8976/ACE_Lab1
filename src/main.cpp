@@ -27,6 +27,8 @@ Bounce s_down = Bounce();
 unsigned long interval = 2000; // interval at which to blink (milliseconds)
 unsigned long time_wait;
 const unsigned long fast_interval = 100;
+int pressed = 0;
+int flag = 0;
 
 // define the structures here:
 
@@ -47,7 +49,6 @@ typedef enum time_machine
   BLINKING,
   PAUSE,
   CONFIG,
-  CONFIGURAR,
 } time_machine;
 
 typedef enum
@@ -173,6 +174,33 @@ void led_show(int leds_to_light_up)
   }
 }
 
+void button_manager()
+{
+  static unsigned long tempo_esperado;
+  if (s_up.fell()) // clicar
+  {
+    Serial.println("Pressionou");
+    flag = 1;
+    tempo_esperado = millis();
+  }
+  if (flag)
+  {
+
+    Serial.println(tempo_esperado);
+    Serial.println(millis());
+    if (millis() - tempo_esperado >= 3000) // 3 segundos ou mais
+    {
+      flag = 0;
+      pressed = 1;
+    }
+    if (s_up.read()) // menos de 3 segundos -> aumentar um intervalo
+    {
+      flag = 0;
+      pressed = 2;
+    }
+  }
+}
+
 void timer_show_leds()
 {
   if (tempo == RUN || tempo == PAUSE)
@@ -199,6 +227,14 @@ void timer_show_leds()
     case LEDS4:
       Serial.println("ENTROU");
       led_show(3);
+
+      if (pressed == 2)
+      {
+        led_mode = ALL;
+        pressed = 0;
+        atual = millis();
+      }
+
       if (tempo == PAUSE)
       {
         led_mode_previous = LEDS4;
@@ -213,6 +249,12 @@ void timer_show_leds()
       break;
     case LEDS3:
       led_show(2);
+      if (pressed == 2)
+      {
+        led_mode = LEDS4;
+        pressed =0;
+        atual = millis();
+      }
       if (tempo == PAUSE)
       {
         led_mode_previous = LEDS3;
@@ -227,6 +269,12 @@ void timer_show_leds()
       break;
     case LEDS2:
       led_show(1);
+      if (pressed == 2)
+      {
+        led_mode = LEDS3;
+        pressed =0;
+        atual = millis();
+      }
       if (tempo == PAUSE)
       {
         led_mode_previous = LEDS2;
@@ -241,6 +289,12 @@ void timer_show_leds()
       break;
     case LEDS1:
       led_show(0);
+      if (pressed == 2)
+      {
+        led_mode = LEDS2;
+        pressed =0;
+        atual = millis();
+      }
       if (tempo == PAUSE)
       {
         led_mode_previous = LEDS1;
@@ -270,7 +324,7 @@ void config_machine_ME()
   switch (config)
   {
   case OFF:
-    if (tempo == CONFIGURAR)
+    if (tempo == CONFIG)
       config = C1;
     break;
   case C1:
@@ -291,49 +345,36 @@ void config_machine_ME()
     break;
   }
 }
+
 void default_function()
 {
   static unsigned long tempo_esperado = 0;
   switch (tempo)
   {
   case IDLE:
-    Serial.println("IDLE");
+    Serial.println(pressed);
     if (s_go.rose())
     {
       tempo = RUN;
     }
-    if (s_up.fell())
+    if (pressed == 1)
     {
       tempo = CONFIG;
-      tempo_previous = IDLE;
-      tempo_esperado = millis();
-      Serial.println("A pressionou");
+      pressed = 0;
     }
     break;
 
   case CONFIG:
-    if (s_up.read() == 1)
+    Serial.println("CONFIG");
+    if (pressed == 1)
     {
-      tempo = tempo_previous;
-    }
-    if ((millis() - tempo_esperado >= 3000) && (s_up.read() == 0))
-    {
-      Serial.println("A pressionar durante 3s");
-      tempo = CONFIGURAR;
+      tempo = RUN;
+      pressed = 0;
     }
     break;
-  case CONFIGURAR:
-    Serial.println("CONFIGURAR");
-    config_machine_ME();
-    break;
+
   case RUN:
-    if (s_up.fell())
-    {
-      tempo = CONFIG;
-      tempo_previous = RUN;
-      tempo_esperado = millis();
-      Serial.println("A pressionou");
-    }
+
     if (led_mode == BLINK)
     {
       tempo = BLINKING;
@@ -341,6 +382,11 @@ void default_function()
     if (s_down.rose())
     {
       tempo = PAUSE;
+    }
+    if (pressed == 1) 
+    {
+      tempo = CONFIG;
+      pressed = 0;
     }
     Serial.println("RUN");
     timer_show_leds();
@@ -369,8 +415,6 @@ void default_function()
     break;
   }
 }
-
-// alínea a)
 
 void configuration_1_ME()
 {
@@ -537,16 +581,17 @@ void loop()
   s_up.update();
   s_down.update();
 
+  button_manager();
+
   default_function();
-  // configuration_3();
+
+  //  configuration_3();
 
   // config_machine_ME();
 
-  configuration_1_ME();
+  // configuration_1_ME();
 
-  configuration_2_ME();
-
-
+  // configuration_2_ME();
 
   // put your main code here, to run repeatedly:
 

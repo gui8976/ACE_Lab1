@@ -25,8 +25,14 @@ Bounce s_up = Bounce();
 Bounce s_down = Bounce();
 
 unsigned long interval = 2000; // interval at which to blink (milliseconds)
+unsigned long fade_interval = 2000;
 unsigned long time_wait;
 const unsigned long fast_interval = 100;
+
+int R = 127;
+int G = 0;
+int B = 255;
+
 int pressed = 0;
 int flag = 0;
 
@@ -68,11 +74,11 @@ typedef enum
 
 typedef enum
 {
-  AZUL,
   VIOLETA,
-  VERMELHO,
-  VERDE,
+  AZUL,
   CIANO,
+  VERDE,
+  AMARELO,
   LARANJA,
   BRANCO,
 } color_machine;
@@ -89,12 +95,12 @@ typedef enum
 } led_machine;
 
 // initiate the values of the structures
-config_machine config = OFF;
+config_machine config = C3;
 
 time_machine tempo = IDLE;
 time_machine tempo_previous = IDLE;
 
-color_machine cor = AZUL;
+color_machine cor = VIOLETA;
 
 config2 config2_mode = Default_timer;
 config1 config1_mode = S2;
@@ -115,7 +121,7 @@ void blink(uint16_t led_to_blink)
 
     if (led_state)
     {
-      strip.neoPixelSetValue(led_to_blink, 255, 255, 255, 1); // por definir as cores
+      strip.neoPixelSetValue(led_to_blink, R, G, B, 1); // por definir as cores
     }
     else
     {
@@ -136,7 +142,7 @@ void blink_with_interval(uint16_t led_to_blink)
 
     if (led_state)
     {
-      strip.neoPixelSetValue(led_to_blink, 255, 255, 255, 1); // por definir as cores
+      strip.neoPixelSetValue(led_to_blink, R, G, B, 1); // por definir as cores
     }
     else
     {
@@ -170,7 +176,26 @@ void led_show(int leds_to_light_up)
   // sees the number of leds that need to be lit up
   for (int leds_to_light = leds_to_light_up; leds_to_light > -1; leds_to_light--)
   {
-    strip.neoPixelSetValue(leds_to_light, 255, 0, 0, 1);
+    strip.neoPixelSetValue(leds_to_light, R, G, B, 1);
+  }
+}
+
+void Half_blink()
+{
+  static unsigned long previousMillis = 0;
+
+  // sets the LED5 as active until half of the interval
+  if (millis() - previousMillis < interval / 2)
+  {
+    strip.neoPixelSetValue(LED5, R, G, B, 1);
+  }
+  if (millis() - previousMillis >= interval / 2)
+  {
+    blink(LED5);
+  }
+  if (millis() - previousMillis >= interval)
+  {
+    previousMillis = millis();
   }
 }
 
@@ -252,7 +277,7 @@ void timer_show_leds()
       if (pressed == 2)
       {
         led_mode = LEDS4;
-        pressed =0;
+        pressed = 0;
         atual = millis();
       }
       if (tempo == PAUSE)
@@ -272,7 +297,7 @@ void timer_show_leds()
       if (pressed == 2)
       {
         led_mode = LEDS3;
-        pressed =0;
+        pressed = 0;
         atual = millis();
       }
       if (tempo == PAUSE)
@@ -292,7 +317,7 @@ void timer_show_leds()
       if (pressed == 2)
       {
         led_mode = LEDS2;
-        pressed =0;
+        pressed = 0;
         atual = millis();
       }
       if (tempo == PAUSE)
@@ -383,7 +408,7 @@ void default_function()
     {
       tempo = PAUSE;
     }
-    if (pressed == 1) 
+    if (pressed == 1)
     {
       tempo = CONFIG;
       pressed = 0;
@@ -471,8 +496,6 @@ void configuration_2_ME()
 {
   if (config == C2)
   {
-
-    unsigned long currentmillis;
     switch (config2_mode)
     {
     case Default_timer:
@@ -480,21 +503,15 @@ void configuration_2_ME()
       if (s_down.rose())
       {
         config2_mode = HalfBlink;
-        currentmillis = millis();
       }
       break;
     case HalfBlink:
-
-      strip.neoPixelSetValue(LED5, 255, 0, 0, 1);
-      if (millis() - currentmillis >= interval / 2)
-      {
-        Serial.println("HALF BLINK");
-        blink(LED5);
-      }
+      Half_blink();
       if (s_down.rose())
         config2_mode = Fade;
       break;
     case Fade:
+      // falta impleentar
       if (s_down.rose())
         config2_mode = Default_timer;
       break;
@@ -505,58 +522,124 @@ void configuration_2_ME()
   }
 }
 
-void choose_color()
+void configuration_3_ME()
 {
   if (config == C3)
   {
     switch (cor)
     {
-    case AZUL:
-      strip.neoPixelSetValue(4, 0, 0, 255, 1);
-      Serial.println("Azul");
-      if (s_down.rose())
-        cor = VIOLETA;
-      break;
     case VIOLETA:
-      strip.neoPixelSetValue(4, 0, 255, 0, 1);
+      strip.neoPixelSetValue(LED5, R, G, B, 1);
       Serial.println("VIOLETA");
       if (s_down.rose())
-        cor = VERMELHO;
+      {
+        cor = AZUL;
+        R = 0;
+        G = 0;
+        B = 255;
+      }
+
       break;
-    case VERMELHO:
-      strip.neoPixelSetValue(LED5, 255, 0, 0, 1);
-      Serial.println("VERMELHO");
+    case AZUL:
+      strip.neoPixelSetValue(LED5, R, G, B, 1);
+      Serial.println("AZUL");
       if (s_down.rose())
-        cor = VERDE;
-      break;
-    case VERDE:
-      strip.neoPixelSetValue(LED5, 0, 255, 255, 1);
-      Serial.println("VERDE");
-      if (s_down.rose())
+      {
         cor = CIANO;
+        R = 0;
+        G = 255;
+        B = 255;
+      }
       break;
     case CIANO:
-      strip.neoPixelSetValue(LED5, 255, 0, 255, 1);
+      strip.neoPixelSetValue(LED5, R, G, B, 1);
       Serial.println("CIANO");
       if (s_down.rose())
+      {
+        cor = VERDE;
+        R = 0;
+        G = 255;
+        B = 0;
+      }
+      break;
+    case VERDE:
+      strip.neoPixelSetValue(LED5, R, G, B, 1);
+      Serial.println("VERDE");
+      if (s_down.rose())
+      {
+        cor = AMARELO;
+        R = 255;
+        G = 255;
+        B = 0;
+      }
+      break;
+    case AMARELO:
+      strip.neoPixelSetValue(LED5, R, G, B, 1);
+      Serial.println("AMARELO");
+      if (s_down.rose())
+      {
         cor = LARANJA;
+        R = 255;
+        G = 167;
+        B = 0;
+      }
       break;
     case LARANJA:
-      strip.neoPixelSetValue(LED5, 255, 255, 0, 1);
+      strip.neoPixelSetValue(LED5, R, G, B, 1);
       Serial.println("LARANJA");
       if (s_down.rose())
+      {
         cor = BRANCO;
+        R = 255;
+        G = 255;
+        B = 255;
+      }
       break;
     case BRANCO:
-      strip.neoPixelSetValue(LED5, 255, 255, 255, 1);
+      strip.neoPixelSetValue(LED5, R, G, B, 1);
       Serial.println("BRANCO");
       if (s_down.rose())
-        cor = AZUL;
+      {
+        cor = VIOLETA;
+        R = 127;
+        G = 0;
+        B = 255;
+      }
       break;
     default:
       break;
     }
   }
+}
+
+
+// recieves the intended interval via interval variabel and the color via R, G, B variables
+// creates a  fade effect function with the variables above
+void fade(){
+
+/*
+  static unsigned long previousMillis = 0;
+  static unsigned long tempo_corrente = millis();
+  if(tempo_corrente - previousMillis <= fade_interval){
+
+    float intervalo = (float)(tempo_corrente - previousMillis) / fade_interval;
+    u_int8_t r = map(intervalo, 0, 1, 0, R);
+    u_int8_t g = map(intervalo, 0, 1, 0, G);
+    u_int8_t b = map(intervalo, 0, 1, 0, B);
+    strip.neoPixelSetValue(LED5, r, g, b, 1);
+    Serial.println(intervalo);
+  }
+}
+*/
+
+
+  for(int i = 0; i < 255; i++){
+    strip.neoPixelSetValue(LED5, i, 0, 0, 1);
+    delay(10);
+  }
+
+
+  
 }
 
 void setup()
@@ -575,17 +658,16 @@ void setup()
   strip.neoPixelClear(1);
 }
 
+
 void loop()
 {
   s_go.update();
   s_up.update();
   s_down.update();
 
-  button_manager();
+  // button_manager();
 
-  default_function();
-
-  //  configuration_3();
+  // default_function();
 
   // config_machine_ME();
 
@@ -593,6 +675,14 @@ void loop()
 
   // configuration_2_ME();
 
+  //configuration_3_ME();
+
+  
+  //Half_blink();
+
+  fade();
+ 
+ 
   // put your main code here, to run repeatedly:
 
   delay(10); //! NÃO ESQUECER DELAY, SENÃO FICA ESTRAGADO

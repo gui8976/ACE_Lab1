@@ -25,9 +25,8 @@ Bounce s_up = Bounce();
 Bounce s_down = Bounce();
 
 unsigned long interval = 2000; // interval at which to blink (milliseconds)
-unsigned long fade_interval = 2000;
 unsigned long time_wait;
-const unsigned long fast_ = 100;
+const unsigned long fast_interval = 100;
 
 int R = 127;
 int G = 0;
@@ -95,7 +94,7 @@ typedef enum
 } led_machine;
 
 // initiate the values of the structures
-config_machine config = C3;
+config_machine config = C2;
 
 time_machine tempo = IDLE;
 time_machine tempo_previous = IDLE;
@@ -151,6 +150,27 @@ void blink_with_interval(uint16_t led_to_blink)
   }
 }
 
+void fast_blink_with_interval(uint16_t led_to_blink)
+{
+  static bool led_state = false;
+  static long previousMillis = 0;
+
+  if (millis() - previousMillis >= 150)
+  {
+    led_state = !led_state;
+    previousMillis = millis();
+
+    if (led_state)
+    {
+      strip.neoPixelSetValue(led_to_blink, R, G, B, 1); // por definir as cores
+    }
+    else
+    {
+      strip.neoPixelSetValue(led_to_blink, 0, 0, 0, 1);
+    }
+  }
+}
+
 void blink_all()
 {
   static bool led_state = false;
@@ -191,7 +211,33 @@ void Half_blink()
   }
   if (millis() - previousMillis >= interval / 2)
   {
-    blink(LED5);
+    Serial.println("blink");
+    fast_blink_with_interval(LED5);
+  }
+  if (millis() - previousMillis >= interval)
+  {
+    previousMillis = millis();
+  }
+}
+
+void fade()
+{
+  static unsigned long previousMillis = 0;
+  if (millis() - previousMillis <= interval)
+  {
+
+    for (int elapsed = interval; elapsed >= 0; elapsed -= 10)
+    {
+
+      u_int8_t r = map(elapsed, 0, interval, 0, R);
+      u_int8_t g = map(elapsed, 0, interval, 0, G);
+      u_int8_t b = map(elapsed, 0, interval, 0, B);
+      strip.neoPixelSetValue(LED5, r, g, b, 1);
+      Serial.println(r);
+      Serial.println(g);
+      Serial.println(b);
+      delay(10);
+    }
   }
   if (millis() - previousMillis >= interval)
   {
@@ -355,25 +401,34 @@ void config_machine_ME()
   case C1:
     blink(LED1);
     if (s_up.rose())
+    {
+
       config = C2;
+      strip.neoPixelClear(1);
+    }
     break;
   case C2:
     blink(LED2);
     if (s_up.rose())
+    {
       config = C3;
+      strip.neoPixelClear(1);
+    }
     break;
     break;
   case C3:
     blink(LED3);
     if (s_up.rose())
+    {
       config = C1;
+      strip.neoPixelClear(1);
+    }
     break;
   }
 }
 
 void default_function()
 {
-  static unsigned long tempo_esperado = 0;
   switch (tempo)
   {
   case IDLE:
@@ -426,7 +481,6 @@ void default_function()
     {
       tempo = CONFIG;
       tempo_previous = PAUSE;
-      tempo_esperado = millis();
       Serial.println("A pressionou");
     }
     if (s_down.rose())
@@ -511,7 +565,7 @@ void configuration_2_ME()
         config2_mode = Fade;
       break;
     case Fade:
-      // falta impleentar
+      fade();
       if (s_down.rose())
         config2_mode = Default_timer;
       break;
@@ -612,36 +666,6 @@ void configuration_3_ME()
   }
 }
 
-
-// recieves the intended interval via interval variabel and the color via R, G, B variables
-// creates a  fade effect function with the variables above
-void fade(){
-
-/*
-  static unsigned long previousMillis = 0;
-  static unsigned long tempo_corrente = millis();
-  if(tempo_corrente - previousMillis <= fade_interval){
-
-    float intervalo = (float)(tempo_corrente - previousMillis) / fade_interval;
-    u_int8_t r = map(intervalo, 0, fade_interval, 0, R);
-    u_int8_t g = map(intervalo, 0, fade_interval, 0, G);
-    u_int8_t b = map(intervalo, 0, fade_interval, 0, B);
-    strip.neoPixelSetValue(LED5, r, g, b, 1);
-    Serial.println(intervalo);
-  }
-}
-*/
-
-
-  for(int i = 0; i < 255; i++){
-    strip.neoPixelSetValue(LED5, i, 0, 0, 1);
-    delay(10);
-  }
-
-
-  
-}
-
 void setup()
 {
   s_go.attach(Sgo, INPUT_PULLUP);
@@ -658,7 +682,6 @@ void setup()
   strip.neoPixelClear(1);
 }
 
-
 void loop()
 {
   s_go.update();
@@ -669,20 +692,17 @@ void loop()
 
   // default_function();
 
-  // config_machine_ME();
+  config_machine_ME();
 
-  // configuration_1_ME();
+  configuration_1_ME();
 
-  // configuration_2_ME();
+  configuration_2_ME();
 
-  //configuration_3_ME();
+  configuration_3_ME();
 
-  
-  //Half_blink();
+  // fast_blink(LED2);
 
-  fade();
- 
- 
+
   // put your main code here, to run repeatedly:
 
   delay(10); //! NÃO ESQUECER DELAY, SENÃO FICA ESTRAGADO

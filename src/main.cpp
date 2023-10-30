@@ -27,7 +27,7 @@ Bounce s_down = Bounce();
 unsigned long interval = 2000; // interval at which to blink (milliseconds)
 unsigned long fade_interval = 2000;
 unsigned long time_wait;
-const unsigned long fast_interval = 100;
+const unsigned long fast_ = 100;
 
 int R = 127;
 int G = 0;
@@ -623,9 +623,9 @@ void fade(){
   if(tempo_corrente - previousMillis <= fade_interval){
 
     float intervalo = (float)(tempo_corrente - previousMillis) / fade_interval;
-    u_int8_t r = map(intervalo, 0, 1, 0, R);
-    u_int8_t g = map(intervalo, 0, 1, 0, G);
-    u_int8_t b = map(intervalo, 0, 1, 0, B);
+    u_int8_t r = map(intervalo, 0, fade_interval, 0, R);
+    u_int8_t g = map(intervalo, 0, fade_interval, 0, G);
+    u_int8_t b = map(intervalo, 0, fade_interval, 0, B);
     strip.neoPixelSetValue(LED5, r, g, b, 1);
     Serial.println(intervalo);
   }

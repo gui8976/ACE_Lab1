@@ -25,7 +25,7 @@ Bounce s_up = Bounce();
 Bounce s_down = Bounce();
 
 unsigned long interval = 2000; // interval at which to blink (milliseconds)
-unsigned long time_wait;
+unsigned long time_waited = 0;
 unsigned long leds = 0;
 const unsigned long fast_interval = 100;
 

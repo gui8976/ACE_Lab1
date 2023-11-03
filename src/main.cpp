@@ -45,6 +45,7 @@ int flag = 0;
 typedef enum config_machine
 {
   OFF,
+  ENTER_CONFIG,
   C1,
   C2,
   C3,
@@ -387,56 +388,66 @@ void effect_mode()
 
 void config_machine_ME()
 {
-  switch (config)
-  {
-  case OFF:
-    Serial.println("OFF");
-    if (tempo == CONFIG)
-      config = C1;
-    break;
-  case C1:
-    Serial.println("C1");
-    blink(LED1);
-    if (s_up.rose())
+    switch (config)
     {
-      config = C2;
-      strip.neoPixelClear(1);
+    case OFF:
+      Serial.println("OFF");
+      if (tempo == CONFIG)
+      {
+        config = ENTER_CONFIG;
+      }
+      break;
+
+    case ENTER_CONFIG:
+      Serial.println("ENTER_CONFIG");
+      if (s_up.rose())
+      {
+        config = C1;
+      }
+      break;
+    case C1:
+      Serial.println("C1");
+      blink(LED1);
+      if (s_up.rose())
+      {
+        config = C2;
+        strip.neoPixelClear(1);
+      }
+      if (tempo != CONFIG)
+      {
+        config = OFF;
+        strip.neoPixelClear(1);
+      }
+      break;
+    case C2:
+      Serial.println("C2");
+      blink(LED2);
+      if (s_up.rose())
+      {
+        config = C3;
+        strip.neoPixelClear(1);
+      }
+      if (tempo != CONFIG)
+      {
+        config = OFF;
+        strip.neoPixelClear(1);
+      }
+      break;
+    case C3:
+      Serial.println("C3");
+      blink(LED3);
+      if (s_up.rose())
+      {
+        config = C1;
+        strip.neoPixelClear(1);
+      }
+      if (tempo != CONFIG)
+      {
+        config = OFF;
+        strip.neoPixelClear(1);
+      }
+      break;
     }
-    if (tempo != CONFIG)
-    {
-      config = OFF;
-      strip.neoPixelClear(1);
-    }
-    break;
-  case C2:
-    Serial.println("C2");
-    blink(LED2);
-    if (s_up.rose())
-    {
-      config = C3;
-      strip.neoPixelClear(1);
-    }
-    if (tempo != CONFIG)
-    {
-      config = OFF;
-      strip.neoPixelClear(1);
-    }
-    break;
-  case C3:
-    Serial.println("C3");
-    blink(LED3);
-    if (s_up.rose())
-    {
-      config = C1;
-      strip.neoPixelClear(1);
-    }
-    if (tempo != CONFIG)
-    {
-      config = OFF;
-      strip.neoPixelClear(1);
-    }
-    break;
-  }
 }
 
 void configuration_1_ME()

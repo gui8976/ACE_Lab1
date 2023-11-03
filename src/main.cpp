@@ -10,8 +10,9 @@
 #define Sdown 4 // GPI4, BOTÃO 3
 #define INTERVAL 2000
 #define TIMER 10000
+#define EFFECT_TIME 30000
 #define MAXIMUM_NUM_NEOPIXELS 5
- 
+
 #define LED1 0
 #define LED2 1
 #define LED3 2
@@ -26,6 +27,7 @@ Bounce s_down = Bounce();
 
 unsigned long interval = 2000; // interval at which to blink (milliseconds)
 unsigned long time_waited = 0;
+unsigned long tempo_effect = 0;
 unsigned long leds = 0;
 const unsigned long fast_interval = 100;
 
@@ -34,6 +36,7 @@ int G = 0;
 int B = 255;
 
 int pressed = 0;
+int offfade = 0;
 int flag = 0;
 
 // define the structures here:
@@ -55,6 +58,7 @@ typedef enum time_machine
   BLINKING,
   PAUSE,
   CONFIG,
+  EFFECT,
 } time_machine;
 
 typedef enum
@@ -212,7 +216,7 @@ void blink_all()
 
     if (led_state)
     {
-      strip.neoPixelFill(0, 255, 255, 1); // por definir as cores
+      strip.neoPixelFill(0, R, G, B); // por definir as cores
     }
     else
     {
@@ -231,7 +235,7 @@ void led_show(int leds_to_light_up)
 }
 
 int led_timer()
-{
+{ // não pode ser static porque senão é sempre verdade, se blinking e clicar em go aquilo só liga led 4
   static unsigned long actual_time = millis();
   if (millis() - actual_time >= interval)
   {
@@ -266,6 +270,8 @@ void Half_blink(u_int8_t led_to_blink)
 void fade(uint8_t led_to_blink)
 {
   static unsigned long previousMillis = 0;
+  offfade = 0;
+  Serial.println(offfade);
   if (millis() - previousMillis <= interval)
   {
 
@@ -279,6 +285,11 @@ void fade(uint8_t led_to_blink)
       Serial.println(r);
       Serial.println(g);
       Serial.println(b);
+      if (s_down.fell())
+      {
+        offfade = 1;
+        Serial.println(offfade);
+      }
       delay(10);
     }
   }
@@ -315,125 +326,65 @@ void button_manager()
   }
 }
 
-/*
-void timer_show_leds()
+void hsvToRgb(int hue, int sat, uint8_t val, uint8_t &r, uint8_t &g, uint8_t &b)
 {
-  if (tempo == RUN || tempo == PAUSE)
+  uint8_t region = hue / 43;
+  uint8_t remainder = (hue - (region * 43)) * 6;
+
+  uint8_t p = (val * (255 - sat)) >> 8;
+  uint8_t q = (val * (255 - ((sat * remainder) >> 8))) >> 8;
+  uint8_t t = (val * (255 - ((sat * (255 - remainder)) >> 8))) >> 8;
+
+  switch (region)
   {
-    static unsigned long atual = millis();
-    switch (led_mode)
-    {
-    case ALL:
-      led_show(4);
-      Serial.println("10s");
-      if (tempo == PAUSE)
-      {
-        led_mode_previous = ALL;
-      }
-      if (millis() - atual >= interval)
-      {
-        led_mode = LEDS4;
-        Serial.println("8s");
-        atual = millis();
-        strip.neoPixelClear(1);
-      }
-
-      break;
-    case LEDS4:
-      Serial.println("ENTROU");
-      led_show(3);
-
-      if (pressed == 2)
-      {
-        led_mode = ALL;
-        pressed = 0;
-        atual = millis();
-      }
-
-      if (tempo == PAUSE)
-      {
-        led_mode_previous = LEDS4;
-      }
-      if (millis() - atual >= interval)
-      {
-        led_mode = LEDS3;
-        Serial.println("6s");
-        atual = millis();
-        strip.neoPixelClear(1);
-      }
-      break;
-    case LEDS3:
-      led_show(2);
-      if (pressed == 2)
-      {
-        led_mode = LEDS4;
-        pressed = 0;
-        atual = millis();
-      }
-      if (tempo == PAUSE)
-      {
-        led_mode_previous = LEDS3;
-      }
-      if (millis() - atual >= interval)
-      {
-        led_mode = LEDS2;
-        Serial.println("4s");
-        atual = millis();
-        strip.neoPixelClear(1);
-      }
-      break;
-    case LEDS2:
-      led_show(1);
-      if (pressed == 2)
-      {
-        led_mode = LEDS3;
-        pressed = 0;
-        atual = millis();
-      }
-      if (tempo == PAUSE)
-      {
-        led_mode_previous = LEDS2;
-      }
-      if (millis() - atual >= interval)
-      {
-        led_mode = LEDS1;
-        Serial.println("2s");
-        atual = millis();
-        strip.neoPixelClear(1);
-      }
-      break;
-    case LEDS1:
-      led_show(0);
-      if (pressed == 2)
-      {
-        led_mode = LEDS2;
-        pressed = 0;
-        atual = millis();
-      }
-      if (tempo == PAUSE)
-      {
-        led_mode_previous = LEDS1;
-      }
-      if (millis() - atual >= interval)
-      {
-        led_mode = BLINK;
-        Serial.println("0s");
-      }
-
-      break;
-    case PAUSED:
-      if (tempo == RUN)
-      {
-        led_mode = led_mode_previous;
-        atual = millis();
-      }
-      break;
-    default:
-      break;
-    }
+  case 0:
+    r = val;
+    g = t;
+    b = p;
+    break;
+  case 1:
+    r = q;
+    g = val;
+    b = p;
+    break;
+  case 2:
+    r = p;
+    g = val;
+    b = t;
+    break;
+  case 3:
+    r = p;
+    g = q;
+    b = val;
+    break;
+  case 4:
+    r = t;
+    g = p;
+    b = val;
+    break;
+  default:
+    r = val;
+    g = p;
+    b = q;
+    break;
   }
 }
-*/
+
+void effect_mode()
+{
+  for (int j = 0; j < 256; j++)
+  {
+    for (int i = 0; i < 5; i++)
+    {
+      int hue = (i * 256 / 5 + j) & 0xFF;
+      uint8_t r, g, b;
+      hsvToRgb(hue, 255, 255, r, g, b);
+      strip.neoPixelSetValue(i, r, g, b, 1);
+    }
+    delay(2);
+  }
+}
+
 void config_machine_ME()
 {
   switch (config)
@@ -487,71 +438,7 @@ void config_machine_ME()
     break;
   }
 }
-/*
-void default_function()
-{
-  switch (tempo)
-  {
-  case IDLE:
-    Serial.println(pressed);
-    if (s_go.rose())
-    {
-      tempo = RUN;
-    }
-    if (pressed == 1)
-    {
-      tempo = CONFIG;
-      pressed = 0;
-    }
-    break;
 
-  case CONFIG:
-    Serial.println("CONFIG");
-    if (pressed == 1)
-    {
-      tempo = RUN;
-      pressed = 0;
-    }
-    break;
-
-  case RUN:
-
-    if (led_mode == BLINK)
-      tempo = BLINKING;
-    if (s_down.rose())
-      tempo = PAUSE;
-
-    if (pressed == 1)
-    {
-      tempo = CONFIG;
-      pressed = 0;
-    }
-    Serial.println("RUN");
-    break;
-  case BLINKING:
-    Serial.println("BLINKING");
-    break;
-
-  case PAUSE:
-    Serial.println("PAUSE");
-    if (s_up.fell())
-    {
-      tempo = CONFIG;
-      tempo_previous = PAUSE;
-      Serial.println("A pressionou");
-    }
-    if (s_down.rose())
-    {
-      tempo = RUN;
-    }
-
-    break;
-
-  default:
-    break;
-  }
-}
-*/
 void configuration_1_ME()
 {
   if (config == C1)
@@ -622,9 +509,9 @@ void configuration_2_ME()
         config2_mode = Fade;
       break;
     case Fade:
-      // fade(LED5);
-      if (s_down.rose())
+      if (s_down.rose() || offfade)
         config2_mode = Default_timer;
+      fade(LED5);
       break;
 
     default:
@@ -723,7 +610,7 @@ void configuration_3_ME()
   }
 }
 
-void teste_tempo()
+void time_configuration_ME()
 {
   switch (tempo)
   {
@@ -741,9 +628,12 @@ void teste_tempo()
     break;
 
   case RUN:
-
+    Serial.println("RUN");
     if (led_mode == BLINK)
+    {
       tempo = BLINKING;
+      tempo_effect = millis();
+    }
     if (s_down.rose())
       tempo = PAUSE;
 
@@ -754,7 +644,6 @@ void teste_tempo()
       tempo_previous = RUN;
       pressed = 0;
     }
-    Serial.println("RUN");
     break;
   case CONFIG:
     Serial.println("CONFIG");
@@ -767,6 +656,13 @@ void teste_tempo()
     break;
   case BLINKING:
     Serial.println("BLINKING");
+    if (millis() - tempo_effect >= EFFECT_TIME)
+    {
+      tempo = EFFECT;
+    }
+    if (led_mode != BLINK)
+      tempo = RUN;
+
     blink_all();
     break;
 
@@ -781,15 +677,22 @@ void teste_tempo()
       tempo_previous = PAUSE;
       pressed = 0;
     }
+
+    break;
+  case EFFECT:
+    Serial.println("EFFECT");
+    effect_mode();
+    if (s_go.rose())
+      tempo = RUN;
     break;
   default:
     break;
   }
 }
 
-void teste_leds()
+void led_configuration_ME()
 {
-  if (tempo == RUN || tempo == PAUSE)
+  if (tempo == RUN || tempo == PAUSE || tempo == BLINKING || tempo == EFFECT)
   {
     switch (led_mode)
     {
@@ -808,6 +711,14 @@ void teste_leds()
       else
         led_show(4);
 
+      if (s_go.rose())
+      {
+        led_mode = ALL;
+        led_mode_previous = ALL;
+      }
+
+      if (s_up.rose())
+        led_mode = ALL;
       if (led_timer())
         led_mode = LEDS4;
 
@@ -832,11 +743,21 @@ void teste_leds()
         led_mode = PAUSED;
         led_mode_previous = LEDS4;
       }
+
+      if (s_go.rose())
+      {
+        led_mode = ALL;
+        led_mode_previous = ALL;
+      }
+
+      if (s_up.rose())
+        led_mode = ALL;
+
       if (led_timer())
         led_mode = LEDS3;
       break;
     case LEDS3:
-      leds = 4;
+      leds = 3;
       if (config2_mode == HalfBlink)
       {
         Half_blink(LED3);
@@ -855,6 +776,16 @@ void teste_leds()
         led_mode = PAUSED;
         led_mode_previous = LEDS3;
       }
+
+      if (s_go.rose())
+      {
+        led_mode = ALL;
+        led_mode_previous = ALL;
+      }
+
+      if (s_up.rose())
+        led_mode = LEDS4;
+
       if (led_timer())
         led_mode = LEDS2;
       break;
@@ -880,18 +811,37 @@ void teste_leds()
         led_mode_previous = LEDS2;
       }
 
+      if (s_go.rose())
+      {
+        led_mode = ALL;
+        led_mode_previous = ALL;
+      }
+
+      if (s_up.rose())
+        led_mode = LEDS3;
+
       if (led_timer())
         led_mode = LEDS1;
 
       break;
     case LEDS1:
       leds = 1;
+
       if (config2_mode == HalfBlink)
         Half_blink(LED1);
       if (config2_mode == Fade)
         fade(LED1);
       else
         led_show(0);
+
+      if (s_go.rose())
+      {
+        led_mode = ALL;
+        led_mode_previous = ALL;
+      }
+
+      if (s_up.rose())
+        led_mode = LEDS2;
 
       if (tempo == PAUSE)
       {
@@ -904,6 +854,9 @@ void teste_leds()
       break;
 
     case BLINK:
+      Serial.println("BLINK");
+      if (s_go.rose())
+        led_mode = ALL;
       break;
     case PAUSED:
       blink_multiple(leds);
@@ -938,11 +891,9 @@ void loop()
 
   button_manager();
 
-  // default_function();
+  time_configuration_ME();
 
-  teste_tempo();
-
-  teste_leds();
+  led_configuration_ME();
 
   config_machine_ME();
 
@@ -951,8 +902,6 @@ void loop()
   configuration_2_ME();
 
   configuration_3_ME();
-
-  // put your main code here, to run repeatedly:
 
   delay(10); //! NÃO ESQUECER DELAY, SENÃO FICA ESTRAGADO
 }

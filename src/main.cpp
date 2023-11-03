@@ -26,10 +26,10 @@ Bounce s_up = Bounce();
 Bounce s_down = Bounce();
 
 unsigned long interval = 2000; // interval at which to blink (milliseconds)
-unsigned long time_waited = 0;
 unsigned long tempo_effect = 0;
 unsigned long leds = 0;
 const unsigned long fast_interval = 100;
+unsigned long actual_time = 0;
 
 int R = 127;
 int G = 0;
@@ -237,7 +237,6 @@ void led_show(int leds_to_light_up)
 
 int led_timer()
 { // não pode ser static porque senão é sempre verdade, se blinking e clicar em go aquilo só liga led 4
-  static unsigned long actual_time = millis();
   if (millis() - actual_time >= interval)
   {
     actual_time = millis();
@@ -671,8 +670,10 @@ void time_configuration_ME()
     {
       tempo = EFFECT;
     }
-    if (led_mode != BLINK)
+    if (led_mode != BLINK){
+      actual_time = millis();
       tempo = RUN;
+    }
 
     blink_all();
     break;
@@ -726,6 +727,7 @@ void led_configuration_ME()
       {
         led_mode = ALL;
         led_mode_previous = ALL;
+        actual_time = millis();
       }
 
       if (s_up.rose())
@@ -759,6 +761,7 @@ void led_configuration_ME()
       {
         led_mode = ALL;
         led_mode_previous = ALL;
+        actual_time = millis();
       }
 
       if (s_up.rose())
@@ -792,6 +795,7 @@ void led_configuration_ME()
       {
         led_mode = ALL;
         led_mode_previous = ALL;
+        actual_time = millis();
       }
 
       if (s_up.rose())
@@ -826,6 +830,7 @@ void led_configuration_ME()
       {
         led_mode = ALL;
         led_mode_previous = ALL;
+        actual_time = millis();
       }
 
       if (s_up.rose())
@@ -866,8 +871,10 @@ void led_configuration_ME()
 
     case BLINK:
       Serial.println("BLINK");
-      if (s_go.rose())
+      if (s_go.rose()){
         led_mode = ALL;
+        actual_time = millis();
+      }
       break;
     case PAUSED:
       blink_multiple(leds);

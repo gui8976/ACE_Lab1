@@ -1,4 +1,3 @@
-
 #include <Arduino.h>
 #include <Bounce2.h>
 #include <NeoPixelConnect.h>
@@ -20,7 +19,6 @@
 #define LED5 4
 
 NeoPixelConnect strip(6, MAXIMUM_NUM_NEOPIXELS, pio0, 0);
-
 Bounce s_go = Bounce();
 Bounce s_up = Bounce();
 Bounce s_down = Bounce();
@@ -34,18 +32,17 @@ unsigned long actual_time = 0;
 int R = 127;
 int G = 0;
 int B = 255;
-
 int pressed = 0;
 int offfade = 0;
+bool ledfaded = false;
 int flag = 0;
-
+int go = 0;
 // define the structures here:
 
 // sturture for the configuration machine
 typedef enum config_machine
 {
   OFF,
-  ENTER_CONFIG,
   C1,
   C2,
   C3,
@@ -206,26 +203,6 @@ void fast_blink_with_interval(uint16_t led_to_blink)
   }
 }
 
-void blink_all()
-{
-  static bool led_state = false;
-  static unsigned long previousMillis = 0;
-  if (millis() - previousMillis >= fast_interval)
-  {
-    led_state = !led_state;
-    previousMillis = millis();
-
-    if (led_state)
-    {
-      strip.neoPixelFill(0, R, G, B); // por definir as cores
-    }
-    else
-    {
-      strip.neoPixelClear(1);
-    }
-  }
-}
-
 void led_show(int leds_to_light_up)
 {
   // sees the number of leds that need to be lit up
@@ -236,7 +213,7 @@ void led_show(int leds_to_light_up)
 }
 
 int led_timer()
-{ // não pode ser static porque senão é sempre verdade, se blinking e clicar em go aquilo só liga led 4
+{
   if (millis() - actual_time >= interval)
   {
     actual_time = millis();
@@ -250,7 +227,6 @@ int led_timer()
 void Half_blink(u_int8_t led_to_blink)
 {
   static unsigned long previousMillis = 0;
-
   // sets the LED5 as active until half of the interval
   if (millis() - previousMillis < interval / 2)
   {
@@ -265,54 +241,53 @@ void Half_blink(u_int8_t led_to_blink)
   {
     previousMillis = millis();
   }
+  if(go) {
+    previousMillis = millis();
+  }
 }
 
 void fade(uint8_t led_to_blink)
 {
   static unsigned long previousMillis = 0;
-  offfade = 0;
-  Serial.println(offfade);
-  if (millis() - previousMillis <= interval)
+  static unsigned long startfade = 0;
+  static int step=255;
+  if (step > 0)
   {
-
-    for (int elapsed = interval; elapsed >= 0; elapsed -= 10)
-    {
-
-      u_int8_t r = map(elapsed, 0, interval, 0, R);
-      u_int8_t g = map(elapsed, 0, interval, 0, G);
-      u_int8_t b = map(elapsed, 0, interval, 0, B);
-      strip.neoPixelSetValue(led_to_blink, r, g, b, 1);
-      Serial.println(r);
-      Serial.println(g);
-      Serial.println(b);
-      if (s_down.fell())
-      {
-        offfade = 1;
-        Serial.println(offfade);
-      }
-      delay(10);
-    }
+    unsigned long elapsed = millis() - startfade;
+    step = 255 - map(constrain(elapsed, 0, interval), 0, interval, 0, 255);
+    uint8_t r = map(step, 0, 255, 0, R);
+    uint8_t g = map(step, 0, 255, 0, G);
+    uint8_t b = map(step, 0, 255, 0, B);
+    strip.neoPixelSetValue(led_to_blink, r, g, b, 1);
   }
   if (millis() - previousMillis >= interval)
   {
-    previousMillis = millis();
+    previousMillis= millis();
+    if(step==0) {ledfaded = true;}
+    else if(step!=0){ledfaded=false;}
+    startfade=millis();
+    step=255;
+  }
+  
+  if(s_go.rose()) {
+    startfade=millis();
+    previousMillis=millis();
   }
 }
 
 void button_manager()
 {
   static unsigned long tempo_esperado;
-  if (s_up.fell()) // clicar
+  if (s_up.fell()) // clicar s_up
   {
-    Serial.println("Pressionou");
+   // Serial.println("Pressionou");
     flag = 1;
     tempo_esperado = millis();
   }
   if (flag)
   {
-
-    Serial.println(tempo_esperado);
-    Serial.println(millis());
+ //   Serial.println(tempo_esperado);
+ //   Serial.println(millis());
     if (millis() - tempo_esperado >= 3000) // 3 segundos ou mais
     {
       flag = 0;
@@ -324,6 +299,20 @@ void button_manager()
       pressed = 2;
     }
   }
+}
+
+void button_down()
+{
+  if(s_down.rose()) offfade=1;
+}
+
+void button_go()
+{
+  if(s_go.rose()){
+    go=1;
+    actual_time=millis();
+    strip.neoPixelClear(1);
+  } 
 }
 
 void hsvToRgb(int hue, int sat, uint8_t val, uint8_t &r, uint8_t &g, uint8_t &b)
@@ -372,78 +361,90 @@ void hsvToRgb(int hue, int sat, uint8_t val, uint8_t &r, uint8_t &g, uint8_t &b)
 
 void effect_mode()
 {
-  for (int j = 0; j < 256; j++)
+  static int j=0;
+  static unsigned long start=0;
+  unsigned long curr = millis();
+  if(start == 0) start = curr;
+  unsigned long elapsed = curr - start;
+
+  if(elapsed >= 2) 
   {
-    for (int i = 0; i < 5; i++)
-    {
-      int hue = (i * 256 / 5 + j) & 0xFF;
-      uint8_t r, g, b;
-      hsvToRgb(hue, 255, 255, r, g, b);
-      strip.neoPixelSetValue(i, r, g, b, 1);
+    start = curr;
+
+  // Update the color cycle
+    j++;
+    if (j >= 256) {
+      j = 0;  // Reset j when it reaches 256
     }
-    delay(2);
+      for (int i = 0; i < 5; i++)
+      {
+        int hue = (i * 256 / 5 + j) & 0xFF;
+        uint8_t r, g, b;
+        hsvToRgb(hue, 255, 255, r, g, b);
+        strip.neoPixelSetValue(i, r, g, b, 1);
+      }
+    
   }
 }
 
 void config_machine_ME()
 {
-    switch (config)
+    switch(config)
     {
     case OFF:
-      Serial.println("OFF");
       if (tempo == CONFIG)
       {
-        config = ENTER_CONFIG;
+        config = C1;
+        strip.neoPixelClear(1);
       }
       break;
 
-    case ENTER_CONFIG:
-      Serial.println("ENTER_CONFIG");
-      if (s_up.rose())
-      {
-        config = C1;
-      }
-      break;
     case C1:
       Serial.println("C1");
       blink(LED1);
-      if (s_up.rose())
+      if (pressed == 2)
       {
         config = C2;
         strip.neoPixelClear(1);
+        pressed = 0;
       }
       if (tempo != CONFIG)
       {
         config = OFF;
         strip.neoPixelClear(1);
+        actual_time=millis();
       }
       break;
     case C2:
       Serial.println("C2");
       blink(LED2);
-      if (s_up.rose())
+      if (pressed == 2)
       {
         config = C3;
         strip.neoPixelClear(1);
+        pressed = 0;
       }
       if (tempo != CONFIG)
       {
         config = OFF;
         strip.neoPixelClear(1);
+        actual_time=millis();
       }
       break;
     case C3:
       Serial.println("C3");
       blink(LED3);
-      if (s_up.rose())
+      if (pressed == 2)
       {
         config = C1;
         strip.neoPixelClear(1);
+        pressed = 0;
       }
       if (tempo != CONFIG)
       {
         config = OFF;
         strip.neoPixelClear(1);
+        actual_time=millis();
       }
       break;
     }
@@ -516,11 +517,20 @@ void configuration_2_ME()
     case HalfBlink:
       Half_blink(LED5);
       if (s_down.rose())
+      {
         config2_mode = Fade;
+        offfade=0;
+        ledfaded=false;
+      }
+        
       break;
     case Fade:
-      if (s_down.rose() || offfade)
+      if (offfade)
+      {
         config2_mode = Default_timer;
+        offfade=0;
+      }
+      Serial.println(offfade);
       fade(LED5);
       break;
 
@@ -625,9 +635,10 @@ void time_configuration_ME()
   switch (tempo)
   {
   case IDLE:
-    if (s_go.rose())
+    if (go){
       tempo = RUN;
-
+      go=0;
+    }
     // o botão foi pressionado durante 3 segundos
     if (pressed == 1)
     {
@@ -638,7 +649,8 @@ void time_configuration_ME()
     break;
 
   case RUN:
-    Serial.println("RUN");
+    //Serial.println("RUN");
+    //Serial.println(interval);
     if (led_mode == BLINK)
     {
       tempo = BLINKING;
@@ -662,10 +674,11 @@ void time_configuration_ME()
     {
       tempo = tempo_previous;
       pressed = 0;
+      actual_time=millis();
+      ledfaded=false;
     }
     break;
   case BLINKING:
-    Serial.println("BLINKING");
     if (millis() - tempo_effect >= EFFECT_TIME)
     {
       tempo = EFFECT;
@@ -675,13 +688,12 @@ void time_configuration_ME()
       tempo = RUN;
     }
 
-    blink_all();
+    blink_multiple(5);
     break;
 
   case PAUSE:
     Serial.println("PAUSE");
-    if (s_down.rose())
-      tempo = RUN;
+    if (s_down.rose()) tempo = RUN;
     // o botão foi pressionado durante 3 segundos
     if (pressed == 1)
     {
@@ -692,10 +704,16 @@ void time_configuration_ME()
 
     break;
   case EFFECT:
-    Serial.println("EFFECT");
     effect_mode();
-    if (s_go.rose())
+    ledfaded=false;
+    if (go)
+    {
       tempo = RUN;
+      go=0;
+      actual_time = millis();
+      strip.neoPixelClear(1);
+    }
+      
     break;
   default:
     break;
@@ -710,36 +728,59 @@ void led_configuration_ME()
     {
     case ALL:
       leds = 5;
+      Serial.println("fade"); Serial.println(ledfaded);
       if (config2_mode == HalfBlink)
       {
+        Serial.println("half - 5");
         Half_blink(LED5);
         led_show(3);
+        ledfaded=false;
       }
       else if (config2_mode == Fade)
       {
-        led_show(3);
+        Serial.println("fade 5");
         fade(LED5);
+        led_show(3);
       }
-      else
+      else if (config2_mode == Default_timer)
+      {
         led_show(4);
-
+      }
       if (s_go.rose())
       {
+        go=0;
         led_mode = ALL;
         led_mode_previous = ALL;
+        strip.neoPixelClear(1);
         actual_time = millis();
+        ledfaded=false;
       }
 
-      if (s_up.rose())
+      if (pressed == 2)
+      {
         led_mode = ALL;
-      if (led_timer())
+        pressed = 0;
+      }
+      if (led_timer()){
+        Serial.println("timer"); Serial.println(led_timer());
+        Serial.println("fade"); Serial.println(ledfaded);
         led_mode = LEDS4;
+        actual_time = millis();
+        ledfaded=false;
+        strip.neoPixelClear(1);
+      }
+      if (tempo == PAUSE)
+      {
+        led_mode = PAUSED;
+        led_mode_previous = ALL;
+      }
 
       break;
     case LEDS4:
       leds = 4;
       if (config2_mode == HalfBlink)
       {
+        Serial.println("half - 4");
         led_show(2);
         Half_blink(LED4);
       }
@@ -748,8 +789,7 @@ void led_configuration_ME()
         led_show(2);
         fade(LED4);
       }
-      else
-        led_show(3);
+      else if(config2_mode==Default_timer){led_show(3);}
 
       if (tempo == PAUSE)
       {
@@ -757,23 +797,35 @@ void led_configuration_ME()
         led_mode_previous = LEDS4;
       }
 
-      if (s_go.rose())
+      if (go)
       {
+        go=0;
         led_mode = ALL;
         led_mode_previous = ALL;
         actual_time = millis();
+        strip.neoPixelClear(1);
+        ledfaded=false;
       }
 
-      if (s_up.rose())
+      if (pressed == 2)
+      {
         led_mode = ALL;
-
-      if (led_timer())
+        pressed = 0;
+      }      
+      if (led_timer()){
         led_mode = LEDS3;
+        actual_time = millis();
+        ledfaded=false;
+                Serial.println("timer 2"); Serial.println(led_timer());
+        Serial.println("fade 2"); Serial.println(ledfaded);
+      }
+        
       break;
     case LEDS3:
       leds = 3;
       if (config2_mode == HalfBlink)
       {
+        Serial.println("half - 3");
         Half_blink(LED3);
         led_show(1);
       }
@@ -782,8 +834,7 @@ void led_configuration_ME()
         led_show(1);
         fade(LED3);
       }
-      else
-        led_show(2);
+      else if(config2_mode==Default_timer){led_show(2);} 
 
       if (tempo == PAUSE)
       {
@@ -791,18 +842,28 @@ void led_configuration_ME()
         led_mode_previous = LEDS3;
       }
 
-      if (s_go.rose())
+      if (go)
       {
+        go=0;
         led_mode = ALL;
         led_mode_previous = ALL;
         actual_time = millis();
+        strip.neoPixelClear(1);
+       ledfaded=false;
       }
 
-      if (s_up.rose())
+      if (pressed == 2){
         led_mode = LEDS4;
-
-      if (led_timer())
+        pressed = 0;
+      }       
+      if (led_timer() /*|| ledfaded == true*/){
         led_mode = LEDS2;
+        actual_time = millis();
+        ledfaded=false;
+                Serial.println("timer 3"); Serial.println(led_timer());
+        Serial.println("fade 3"); Serial.println(ledfaded);
+      }
+        
       break;
 
     case LEDS2:
@@ -817,8 +878,7 @@ void led_configuration_ME()
         led_show(0);
         fade(LED2);
       }
-      else
-        led_show(1);
+      else if(config2_mode==Default_timer){led_show(1);} 
 
       if (tempo == PAUSE)
       {
@@ -826,60 +886,82 @@ void led_configuration_ME()
         led_mode_previous = LEDS2;
       }
 
-      if (s_go.rose())
+      if (go)
       {
+        go=0;
         led_mode = ALL;
         led_mode_previous = ALL;
         actual_time = millis();
+        strip.neoPixelClear(1);
+        ledfaded=false;
       }
 
-      if (s_up.rose())
+      if (pressed == 2)
+      {
         led_mode = LEDS3;
+        pressed = 0;
+      }       
 
-      if (led_timer())
+      if (led_timer() /*|| ledfaded == true*/){
         led_mode = LEDS1;
-
+        actual_time = millis();
+        ledfaded=false;
+                Serial.println("timer 4"); Serial.println(led_timer());
+        Serial.println("fade 4"); Serial.println(ledfaded);
+        strip.neoPixelClear(1);
+      }
+        
       break;
     case LEDS1:
       leds = 1;
+      if (config2_mode == HalfBlink) Half_blink(LED1);
+      if (config2_mode == Fade) fade(LED1);
+      else if(config2_mode==Default_timer){led_show(0);} 
 
-      if (config2_mode == HalfBlink)
-        Half_blink(LED1);
-      if (config2_mode == Fade)
-        fade(LED1);
-      else
-        led_show(0);
-
-      if (s_go.rose())
+      if (go)
       {
+        go=0;
         led_mode = ALL;
         led_mode_previous = ALL;
+        actual_time=millis();
+        strip.neoPixelClear(1);
+        ledfaded=false;
       }
 
-      if (s_up.rose())
+      if (pressed == 2)
+      {
         led_mode = LEDS2;
-
+        pressed = 0;
+      }
       if (tempo == PAUSE)
       {
         led_mode = PAUSED;
         led_mode_previous = LEDS1;
       }
 
-      if (led_timer())
+      if (led_timer() || ledfaded == true){
         led_mode = BLINK;
+        actual_time = millis();
+        ledfaded=false;
+      }
+        
       break;
 
     case BLINK:
-      Serial.println("BLINK");
+      ledfaded=false;
       if (s_go.rose()){
+        go=0;
         led_mode = ALL;
         actual_time = millis();
+        strip.neoPixelClear(1);
       }
       break;
     case PAUSED:
       blink_multiple(leds);
       if (tempo == RUN)
+      {
         led_mode = led_mode_previous;
+      }
       break;
     }
   }
@@ -908,6 +990,8 @@ void loop()
   s_down.update();
 
   button_manager();
+  button_down();
+  button_go();
 
   time_configuration_ME();
 
@@ -921,5 +1005,6 @@ void loop()
 
   configuration_3_ME();
 
-  delay(10); //! NÃO ESQUECER DELAY, SENÃO FICA ESTRAGADO
+
+  delay(9); //! NÃO ESQUECER DELAY, SENÃO FICA ESTRAGADO
 }

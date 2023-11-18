@@ -12,6 +12,8 @@
 #define EFFECT_TIME 30000
 #define MAXIMUM_NUM_NEOPIXELS 5
 
+
+
 #define LED1 0
 #define LED2 1
 #define LED3 2

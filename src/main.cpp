@@ -18,6 +18,8 @@
 #define LED4 3
 #define LED5 4
 
+
+
 NeoPixelConnect strip(6, MAXIMUM_NUM_NEOPIXELS, pio0, 0);
 Bounce s_go = Bounce();
 Bounce s_up = Bounce();
